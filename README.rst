@@ -1,6 +1,7 @@
 A small helper library using minimalmodbus for the popular DPSXXXX power supply modules
 
 Dependencies:
+
 *   minimalmodbus
 *   pyserial
 
