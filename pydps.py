@@ -7,7 +7,7 @@ class PyDPS(minimalmodbus.Instrument):
     DPS interface class for python.
 
     The DPSXXXX power supplies use the ModBus protocol for communication. This class uses the
-    :class:minimalmodbus.Instrument class to take care of the low-level ModBus implementation and provides a boiler
+    :class:`minimalmodbus.Instrument` class to take care of the low-level ModBus implementation and provides a boiler
     plate to easily access and control the power supply, without the need of remembering register addresses
 
     :param port_name: Name of the COM port as string

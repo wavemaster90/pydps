@@ -1,5 +1,7 @@
 @ECHO OFF
 
+python prepare_doc_build.py
+
 pushd %~dp0
 
 REM Command file for Sphinx documentation
