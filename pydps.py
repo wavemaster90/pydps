@@ -1,5 +1,85 @@
 import minimalmodbus
 import serial
+import enum
+
+
+class ParamName(enum.Enum):
+    """
+    Enum class containing the register addresses of all DPS variables and parameters
+    """
+    U_SET = 0x0000      #: Set voltage (R/W)
+    I_SET = 0x0001      #: Set current
+    U_OUT = 0x0002      #: Output voltage
+    I_OUT = 0x0003      #: Output current
+    P_OUT = 0x0004      #: Output power
+    U_IN = 0x0005       #: Input voltage
+    LOCK = 0x0006       #: Key lock
+    PROTECT = 0x0007    #: Protection status
+    CV_CC = 0x0008      #: Regulation mode
+    ON_OFF = 0x0009     #: Output enable
+    B_LED = 0x000A      #: LED backlight brightness
+    MODEL = 0x000B      #: Model number
+    VERSION = 0x000C    #: Firmware version number
+
+
+class SettingName(enum.Enum):
+    """
+    Enum class containing the relative addresses of all DPS data group settings
+    """
+    U_SET = 0x0000  #: Set voltage
+    I_SET = 0x0001  #: Set  current
+    OVP = 0x0002    #: Over voltage protection voltage
+    OCP = 0x0003    #: Over current protection current
+    OPP = 0x0004    #: Over power protection power
+    B_LED = 0x0005  #: LED backlight brightness
+    M_PRE = 0x0006  #: Memory preset number
+    INI = 0x0007    #: Initial output state
+
+
+class DataGroup(enum.Enum):
+    """
+    Enum class containing all data group base addresses
+    """
+    M0 = 0x0000
+    M1 = 0x0010
+    M2 = 0x0020
+    M3 = 0x0030
+    M4 = 0x0040
+    M5 = 0x0050
+    M6 = 0x0060
+    M7 = 0x0070
+    M8 = 0x0080
+    M9 = 0x0090
+
+
+class ParamInfo:
+    """
+    'Data class' containing all information about a parameter
+
+    :param read: read access flag
+    :param write: write access flag
+    :param unit: scientific unit of parameter
+    :param description: human readable value description
+    :param value_range: value range of parameter
+    :param integer: flag indicating only integer values are allowed
+    """
+    def __init__(self, read, write, unit, description, value_range=None, integer=False):
+        """
+        Class constructor
+
+        :param read: read access flag
+        :param write: write access flag
+        :param unit: scientific unit of parameter
+        :param description: human readable value description
+        :param value_range: value range of parameter
+        :param integer: flag indicating only integer values are allowed
+        """
+        self.read = read                #: read access flag
+        self.write = write              #: write access flag
+        self.unit = unit                #: scientific unit of parameter
+        self.description = description  #: human readable value description
+        self.value_range = value_range  #: value range of parameter
+        self.integer = integer          #: flag indicating only integer values are allowed
 
 
 class PyDPS(minimalmodbus.Instrument):
@@ -10,7 +90,7 @@ class PyDPS(minimalmodbus.Instrument):
     :class:`minimalmodbus.Instrument` class to take care of the low-level ModBus implementation and provides a boiler
     plate to easily access and control the power supply, without the need of remembering register addresses
 
-    :param port_name: Name of the COM port as string
+    :param port_name: ParamName of the COM port as string
     :param slave_address: Slave address (defaults to one)
     """
 
@@ -18,9 +98,12 @@ class PyDPS(minimalmodbus.Instrument):
         """
         Class constructor
 
-        :param port_name: Name of the COM port as string
+        :param port_name: ParamName of the COM port as string
         :param slave_address: Slave address (defaults to one)
         """
+        # --------------------------------
+        # Initialize the modbus connection
+        # --------------------------------
         minimalmodbus.Instrument.__init__(self, port_name, slave_address, mode='rtu')
         self.serial.baudrate = 9600
         self.serial.bytesize = 8
@@ -28,6 +111,198 @@ class PyDPS(minimalmodbus.Instrument):
         self.serial.stopbits = 1
         self.serial.timeout = 0.5
 
+        # ----------------------------------------
+        # Populate the parameter info dictionaries
+        # ----------------------------------------
+        #: Dictionary containing information about every parameter
+        self.ParameterInfo = {
+            ParamName.U_SET.value: ParamInfo(True, True, "V", "Set voltage"),
+            ParamName.I_SET.value: ParamInfo(True, True, "A", "Set current"),
+            ParamName.U_OUT.value: ParamInfo(True, False, "V", "Measured output voltage"),
+            ParamName.I_OUT.value: ParamInfo(True, False, "A", "Measured output current"),
+            ParamName.P_OUT.value: ParamInfo(True, False, "W", "Measured output power"),
+            ParamName.U_IN.value: ParamInfo(True, False, "V", "Measured input voltage"),
+            ParamName.LOCK.value: ParamInfo(True, True, "-", "Key lock", [0, 1], True),
+            ParamName.PROTECT.value: ParamInfo(True, False, "-", "Protection status"),
+            ParamName.CV_CC.value: ParamInfo(True, False, "-", "Operation status (constant voltage or current)"),
+            ParamName.ON_OFF.value: ParamInfo(True, True, "-", "Output active state", [0, 1], True),
+            ParamName.B_LED.value: ParamInfo(True, True, "-", "Backlight brightness level", [0, 5], True),
+            ParamName.MODEL.value: ParamInfo(True, False, "-", "Product model"),
+            ParamName.VERSION.value: ParamInfo(True, False, "-", "Firmware version"),
+        }
+
+        #: Dictionary containing info about every setting
+        self.SettingInfo = {
+            SettingName.U_SET.value: ParamInfo(True, True, "V", "Set voltage"),
+            SettingName.I_SET.value: ParamInfo(True, True, "A", "Set current"),
+            SettingName.OVP.value: ParamInfo(True, True, "V", "Over-voltage protection value"),
+            SettingName.OCP.value: ParamInfo(True, True, "A", "Over-current protection value"),
+            SettingName.OPP.value: ParamInfo(True, True, "W", "Over-power protection value"),
+            SettingName.B_LED.value: ParamInfo(True, True, "-", "Backlight brightness level", [0, 5], True),
+            SettingName.M_PRE.value: ParamInfo(True, True, "-", "Memory preset number", [0, 9], True),
+            SettingName.INI.value: ParamInfo(True, True, "-", "Power output switch", [0, 1], True),
+        }
+
+        # --------------------------------------------------------------------
+        # Coerce initial information with data from the connected power supply
+        # --------------------------------------------------------------------
+        model = str(self.get_model())
+        voltage = int(model.split(".")[0])
+        current = int(model.split(".")[1])
+
+        max_current = current
+        max_voltage = self.get_input_voltage() / 1.1
+
+        self.ParameterInfo[ParamName.U_SET.value].value_range = [0, max_voltage]
+        self.ParameterInfo[ParamName.I_SET.value].value_range = [0, max_current]
+
+        self.SettingInfo[SettingName.U_SET.value].value_range = [0, max_voltage]
+        self.SettingInfo[SettingName.I_SET.value].value_range = [0, max_current]
+        self.SettingInfo[SettingName.OVP.value].value_range = [0, voltage * 1.02]
+        self.SettingInfo[SettingName.OCP.value].value_range = [0, current * 1.01]
+        self.SettingInfo[SettingName.OPP.value].value_range = [0, current * voltage * 1.01]
+
+    # ------------------------------------------------
+    # Generic getters and setters for programmatic use
+    # ------------------------------------------------
+    def get_parameter(self, name):
+        """
+        Get the current value of a parameter or setting by using either its address or the corresponding enum value
+
+        :param name: register address or coresponding :class:`ParamName`/:class:`SettingName` enum
+        :return: the current value of the queried modbus register
+        """
+        address = self._check_name(name)
+
+        return self.read_register(address, 2)
+
+    def set_parameter(self, name, value):
+        """
+        Sets a given value to a ModBus register either using its address or the corresponding enum value
+
+        Before writing the register, the value get checked, whether it is writable, in is allowed range and is of
+        allowed type.
+
+        :param name: register address or corresponding :class:`ParamName`/:class:`SettingName` enum
+        :param value: value to set
+        :return:
+        """
+        address = self._check_name(name)
+        self._check_writable(address)
+        boolean = self._check_value(address, value)
+
+        if boolean:
+            self.write_register(address, value, 0)
+        else:
+            self.write_register(address, value, 2)
+
+    # -------------------------------
+    # Get lists of parameters at once
+    # -------------------------------
+    def get_all_parameters(self):
+        """
+        Get all parameters of the power supply in one query
+
+        :return: Dictionary containing the returned values. Accessible via :class:ParamName enum
+        """
+        response = self.read_registers(0x00, 13)
+        data = {
+            ParamName.U_SET: response[0] * 0.01,
+            ParamName.I_SET: response[1] * 0.01,
+            ParamName.U_OUT: round(response[2] * 0.01, 2),
+            ParamName.I_OUT: round(response[3] * 0.01, 2),
+            ParamName.P_OUT: round(response[4] * 0.01, 2),
+            ParamName.U_IN: response[5] * 0.01,
+            ParamName.LOCK: response[6],
+            ParamName.PROTECT: response[7],
+            ParamName.CV_CC: response[8],
+            ParamName.ON_OFF: response[9],
+            ParamName.B_LED: response[10],
+            ParamName.MODEL: response[11],
+            ParamName.VERSION: response[12],
+        }
+        return data
+
+    def get_all_variables(self):
+        """
+        Get all variable values of the power supply in one query
+
+        :return: Dictionary containing the returned values. Accessible via :class:ParamName enum
+        """
+        response = self.read_registers(0x00, 11)
+        data = {
+            ParamName.U_SET: response[0] * 0.01,
+            ParamName.I_SET: response[1] * 0.01,
+            ParamName.U_OUT: round(response[2] * 0.01, 2),
+            ParamName.I_OUT: round(response[3] * 0.01, 2),
+            ParamName.P_OUT: round(response[4] * 0.01, 2),
+            ParamName.U_IN: response[5] * 0.01,
+            ParamName.LOCK: response[6],
+            ParamName.PROTECT: response[7],
+            ParamName.CV_CC: response[8],
+            ParamName.ON_OFF: response[9],
+            ParamName.B_LED: response[10]
+        }
+        return data
+
+    def get_all_measurements(self):
+        """
+        Get all physical measurement of the power supply in one query
+
+        :return: Dictionary containing the returned values. Accessible via :class:ParamName enum
+        """
+        response = self.read_registers(ParamName.U_OUT.value, 4)
+        data = {
+            ParamName.U_OUT: round(response[0] * 0.01, 2),
+            ParamName.I_OUT: round(response[1] * 0.01, 2),
+            ParamName.P_OUT: round(response[2] * 0.01, 2),
+        }
+        return data
+
+    def get_set_values(self):
+        """
+        Get all set values of the power supply in one query
+
+        :return: Dictionary containing the returned values. Accessible via :class:ParamName enum
+        """
+        response = self.read_registers(ParamName.U_SET.value, 2)
+        data = {
+            ParamName.U_SET: round(response[0] * 0.01, 2),
+            ParamName.I_SET: round(response[1] * 0.01, 2),
+        }
+        return data
+
+    def get_full_state_info(self):
+        """
+        Get all state related parameters of the power supply in one query
+
+        :return: Dictionary containing the returned values. Accessible via :class:ParamName enum
+        """
+        response = self.read_registers(ParamName.LOCK.value, 4)
+        data = {
+            ParamName.LOCK: response[0],
+            ParamName.PROTECT: response[1],
+            ParamName.CV_CC: response[2],
+            ParamName.ON_OFF: response[3],
+        }
+        return data
+
+    def get_device_info(self):
+        """
+        Get all parameters containing information about power supply itself in one query
+
+        :return: Dictionary containing the returned values. Accessible via :class:ParamName enum
+        """
+        response = self.read_registers(ParamName.MODEL.value, 2)
+        data = {
+            ParamName.MODEL: response[0],
+            ParamName.VERSION: response[1],
+        }
+        return data
+
+    # ---------------------------------------------------------------
+    # Boiler plate getters and setters, for easy use in console style
+    # ---------------------------------------------------------------
     def set_voltage(self, voltage):
         """
         Set the set voltage of the power supply with 10 mV precision
@@ -35,7 +310,15 @@ class PyDPS(minimalmodbus.Instrument):
         :param voltage: desired voltage with 10 mV precision
         :return:
         """
-        self.write_register(0x0000, voltage, 2)
+        self.set_parameter(ParamName.U_SET, voltage)
+
+    def get_set_voltage(self):
+        """
+        Get the set voltage
+
+        :return: set voltage
+        """
+        return self.get_parameter(ParamName.U_SET)
 
     def set_current(self, current):
         """
@@ -44,7 +327,15 @@ class PyDPS(minimalmodbus.Instrument):
         :param current: max. current with 10 mV precision
         :return:
         """
-        self.write_register(0x0001, current, 2)
+        self.set_parameter(ParamName.I_SET, current)
+
+    def get_set_current(self):
+        """
+        Get the set current
+
+        :return: set current
+        """
+        return self.get_parameter(ParamName.I_SET)
 
     def get_voltage(self):
         """
@@ -52,7 +343,7 @@ class PyDPS(minimalmodbus.Instrument):
 
         :return: current output voltage
         """
-        return self.read_register(0x0002, 2)
+        return self.get_parameter(ParamName.U_OUT)
 
     def get_current(self):
         """
@@ -60,7 +351,7 @@ class PyDPS(minimalmodbus.Instrument):
 
         :return: output current
         """
-        return self.read_register(0x0003, 2)
+        return self.get_parameter(ParamName.I_OUT)
 
     def get_power(self):
         """
@@ -68,16 +359,7 @@ class PyDPS(minimalmodbus.Instrument):
 
         :return: output power
         """
-        return self.read_register(0x0004, 2)
-
-    def set_output(self, enabled):
-        """
-        Enable or disable the output
-
-        :param enabled: True for enabled, False else
-        :return:
-        """
-        self.write_register(0x0009, (1 if enabled else 0), 0)
+        return self.get_parameter(ParamName.P_OUT)
 
     def get_input_voltage(self):
         """
@@ -85,15 +367,77 @@ class PyDPS(minimalmodbus.Instrument):
 
         :return: input voltage
         """
-        return self.read_register(0x0005, 2)
+        return self.get_parameter(ParamName.U_IN)
 
-    def get_firmware_version(self):
+    def set_key_lock(self, lock):
         """
-        Read the firmware version
+        Enable or disable the key lock for the embedded interface
 
-        :return: version number
+        :param lock: True to enable lock, false otherwise
+        :return:
         """
-        return self.read_register(0x000C, 0)
+        self.set_parameter(ParamName.LOCK, lock)
+
+    def get_key_lock(self):
+        """
+        Get the current status of the key lock
+
+        :return: status of the key lock
+        """
+        return self.get_parameter(ParamName.LOCK)
+
+    def get_protection_status(self):
+        """
+        Get the current status of the protection circuit
+
+        :return: status of the protection circuit
+        """
+        return self.get_parameter(ParamName.PROTECT)
+
+    def get_cc_cv_status(self):
+        """
+        Get the regulation status of the power supply
+
+        If the returned value is True, the supply is in constant voltage mode. Otherwise it operates in current limit
+        mode
+
+        :return: True for CV, False for CC
+        """
+        return self.get_parameter(ParamName.CV_CC)
+
+    def set_output(self, enable):
+        """
+        Enable or disable the output
+
+        :param enable: True for enabled, False else
+        :return:
+        """
+        self.set_parameter(ParamName.ON_OFF, enable)
+
+    def get_output(self):
+        """
+        Query whether the supply has an active output or not
+
+        :return: True if output is active, False else
+        """
+        return self.get_parameter(ParamName.ON_OFF)
+
+    def set_brightness(self, brightness):
+        """
+        Set the brightness of the LED backlight
+
+        :param brightness: brightness value from 0 - 5
+        :return:
+        """
+        return self.set_parameter(ParamName.B_LED, brightness)
+
+    def get_brightness(self):
+        """
+        Get the current brightness level of the LED backlight
+
+        :return: brightness level from 0 - 5
+        """
+        return self.get_parameter(ParamName.B_LED)
 
     def get_model(self):
         """
@@ -101,33 +445,65 @@ class PyDPS(minimalmodbus.Instrument):
 
         :return: DPS model number
         """
-        return self.read_register(0x000B, 0)
+        return self.get_parameter(ParamName.MODEL)
 
-    def set_key_lock(self, enable):
+    def get_firmware_version(self):
         """
-        Enable or disable the key lock for the embedded interface
+        Read the firmware version
 
-        :param enable: True to enable lock, false otherwise
+        :return: version number
+        """
+        return self.get_parameter(ParamName.VERSION)
+
+    # -------------------------
+    # Variable and value checks
+    # -------------------------
+    def _check_name(self, name):
+        """
+        Check the given enum value or register address. Raise an error, if the address is unknown
+
+        :param name: name or register address of the parameter
+        :return: register address of the parameter
+        """
+        if isinstance(name, enum.Enum):
+            address = name.value
+        else:
+            address = name
+        if address not in self.ParameterInfo:
+            raise ValueError("The parameter address is not known")
+        return address
+
+    def _check_writable(self, address):
+        """
+        Check whether the parameter of the given address is writable
+
+        :param address: verified parameter address
         :return:
         """
-        self.write_register(0x0006, (1 if enable else 0), 0)
+        if address in self.ParameterInfo:
+            writable = self.ParameterInfo[address].write
+        else:
+            writable = self.SettingInfo[address].write
+        if not writable:
+            raise ValueError("The parameter is not writable")
 
-    def get_full_data(self):
+    def _check_value(self, address, value):
         """
-        Read all variables at once
+        Check whether the given value is allowed to be written into the given register address
 
-        :return: dictionary containing the variable readings
+        :param address: parameter register address for write operation
+        :param value: value to be written
+        :return:
         """
-        buffer = self.read_registers(0x00, 10)
-        data = {
-            "u-set": buffer[0]*0.01,
-            "i-set": buffer[1]*0.001,
-            "u-out": round(buffer[2]*0.01, 2),
-            "i-out": round(buffer[3]*0.01, 2),
-            "power": round(buffer[4]*0.01, 2),
-            "u-in": buffer[5]*0.01,
-            "lock": buffer[6],
-            "protect": buffer[7],
-            "cvcc": buffer[8],
-            "on": buffer[9]}
-        return data
+        if address in self.ParameterInfo:
+            info = self.ParameterInfo[address]
+        else:
+            info = self.SettingInfo[address]
+
+        value_range = info.value_range
+        if not value_range:
+            raise ValueError("No value range is given")
+        elif value < value_range[0] or value > value_range[1]:
+            raise ValueError("Value outside of allowed range")
+
+        return info.integer
