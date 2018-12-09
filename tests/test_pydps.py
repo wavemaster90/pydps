@@ -258,3 +258,10 @@ def test_generic_version_getter(mocker):
     dps, modbus, device = initialize_connection(mocker)
 
     assert isinstance(dps.get_parameter(ParamName.VERSION), float)
+
+# TODO: Test multiple value getters
+# TODO: Test boiler plate getters and setters
+# TODO: Test read invalid register
+# TODO: Test write to read-only register
+# TODO: Test write values outside of permitted range
+# TODO: Test write wrong data tyepe (float instead of int)
