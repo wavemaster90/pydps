@@ -1,7 +1,7 @@
 from pydps import ParamName, PyDPS
 import pytest
-import unittest.mock as mock
 import minimalmodbus
+import numpy as np
 
 
 class MockDPS:
@@ -64,7 +64,7 @@ class MockDPS:
         """
         info = self._check_valid_register(register)
 
-        print("Register %s read." % info[0])
+        print("DPS: Register %s read." % info[0])
         return info[2]
 
     def write_register(self, register, value, numberOfDecimals=0):
@@ -80,6 +80,7 @@ class MockDPS:
         self._check_writable(info)
 
         info[2] = value
+        print("DPS: %s into register %s." % (info[2], info[0]))
 
     def _check_valid_register(self, register):
         """
@@ -93,7 +94,7 @@ class MockDPS:
         elif register in self.sett_registers:
             info = self.sett_registers[register]
         else:
-            print("Register not recognized.")
+            print("DPS: Register not recognized.")
             assert False
 
         return info
@@ -205,3 +206,55 @@ def initialize_connection(mocker):
 
     return dps, modbus, device
 
+
+@pytest.mark.parametrize(
+    "parameter",
+    [
+        ParamName.V_SET,
+        ParamName.I_SET,
+        ParamName.V_OUT,
+        ParamName.I_OUT,
+        ParamName.P_OUT,
+        ParamName.LOCK,
+        ParamName.PROTECT,
+        ParamName.CV_CC,
+        ParamName.ON_OFF,
+        ParamName.B_LED,
+    ],
+)
+def test_generic_getters_setters(parameter, mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    info = dps.get_parameter_info(parameter)
+
+    if info.integer:
+        tries = np.arange(info.value_range[0], info.value_range[1] + 1)
+    else:
+        tries = np.round(np.random.uniform(info.value_range[0], info.value_range[1], 100), 2)
+
+    if info.write:
+        for value in tries:
+            dps.set_parameter(parameter, value)
+            assert dps.get_parameter(parameter) == value
+    else:
+        for value in tries:
+            device.param_registers[parameter.value][2] = value
+            assert dps.get_parameter(parameter) == value
+
+
+def test_generic_v_in_getter(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    assert dps.get_parameter(ParamName.V_IN) == 48
+
+
+def test_generic_model_getter(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    assert dps.get_parameter(ParamName.MODEL) == 50.15
+
+
+def test_generic_version_getter(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    assert isinstance(dps.get_parameter(ParamName.VERSION), float)

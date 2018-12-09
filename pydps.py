@@ -7,12 +7,12 @@ class ParamName(enum.Enum):
     """
     Enum class containing the register addresses of all DPS variables and parameters
     """
-    U_SET = 0x0000      #: Set voltage (R/W)
+    V_SET = 0x0000      #: Set voltage (R/W)
     I_SET = 0x0001      #: Set current
-    U_OUT = 0x0002      #: Output voltage
+    V_OUT = 0x0002      #: Output voltage
     I_OUT = 0x0003      #: Output current
     P_OUT = 0x0004      #: Output power
-    U_IN = 0x0005       #: Input voltage
+    V_IN = 0x0005       #: Input voltage
     LOCK = 0x0006       #: Key lock
     PROTECT = 0x0007    #: Protection status
     CV_CC = 0x0008      #: Regulation mode
@@ -26,7 +26,7 @@ class SettingName(enum.Enum):
     """
     Enum class containing the relative addresses of all DPS data group settings
     """
-    U_SET = 0x0000  #: Set voltage
+    V_SET = 0x0000  #: Set voltage
     I_SET = 0x0001  #: Set  current
     OVP = 0x0002    #: Over voltage protection voltage
     OCP = 0x0003    #: Over current protection current
@@ -116,15 +116,15 @@ class PyDPS(minimalmodbus.Instrument):
         # ----------------------------------------
         #: Dictionary containing information about every parameter
         self.ParameterInfo = {
-            ParamName.U_SET.value: ParamInfo(True, True, "V", "Set voltage"),
+            ParamName.V_SET.value: ParamInfo(True, True, "V", "Set voltage"),
             ParamName.I_SET.value: ParamInfo(True, True, "A", "Set current"),
-            ParamName.U_OUT.value: ParamInfo(True, False, "V", "Measured output voltage"),
+            ParamName.V_OUT.value: ParamInfo(True, False, "V", "Measured output voltage"),
             ParamName.I_OUT.value: ParamInfo(True, False, "A", "Measured output current"),
             ParamName.P_OUT.value: ParamInfo(True, False, "W", "Measured output power"),
-            ParamName.U_IN.value: ParamInfo(True, False, "V", "Measured input voltage"),
+            ParamName.V_IN.value: ParamInfo(True, False, "V", "Measured input voltage"),
             ParamName.LOCK.value: ParamInfo(True, True, "-", "Key lock", [0, 1], True),
-            ParamName.PROTECT.value: ParamInfo(True, False, "-", "Protection status"),
-            ParamName.CV_CC.value: ParamInfo(True, False, "-", "Operation status (constant voltage or current)"),
+            ParamName.PROTECT.value: ParamInfo(True, False, "-", "Protection status", [0, 1]),
+            ParamName.CV_CC.value: ParamInfo(True, False, "-", "Voltage control or current limit mode", [0, 1]),
             ParamName.ON_OFF.value: ParamInfo(True, True, "-", "Output active state", [0, 1], True),
             ParamName.B_LED.value: ParamInfo(True, True, "-", "Backlight brightness level", [0, 5], True),
             ParamName.MODEL.value: ParamInfo(True, False, "-", "Product model"),
@@ -133,7 +133,7 @@ class PyDPS(minimalmodbus.Instrument):
 
         #: Dictionary containing info about every setting
         self.SettingInfo = {
-            SettingName.U_SET.value: ParamInfo(True, True, "V", "Set voltage"),
+            SettingName.V_SET.value: ParamInfo(True, True, "V", "Set voltage"),
             SettingName.I_SET.value: ParamInfo(True, True, "A", "Set current"),
             SettingName.OVP.value: ParamInfo(True, True, "V", "Over-voltage protection value"),
             SettingName.OCP.value: ParamInfo(True, True, "A", "Over-current protection value"),
@@ -153,10 +153,13 @@ class PyDPS(minimalmodbus.Instrument):
         max_current = current
         max_voltage = self.get_input_voltage() / 1.1
 
-        self.ParameterInfo[ParamName.U_SET.value].value_range = [0, max_voltage]
+        self.ParameterInfo[ParamName.V_SET.value].value_range = [0, max_voltage]
         self.ParameterInfo[ParamName.I_SET.value].value_range = [0, max_current]
+        self.ParameterInfo[ParamName.V_OUT.value].value_range = [0, max_voltage]
+        self.ParameterInfo[ParamName.I_OUT.value].value_range = [0, max_current]
+        self.ParameterInfo[ParamName.P_OUT.value].value_range = [0, max_current * max_voltage]
 
-        self.SettingInfo[SettingName.U_SET.value].value_range = [0, max_voltage]
+        self.SettingInfo[SettingName.V_SET.value].value_range = [0, max_voltage]
         self.SettingInfo[SettingName.I_SET.value].value_range = [0, max_current]
         self.SettingInfo[SettingName.OVP.value].value_range = [0, voltage * 1.02]
         self.SettingInfo[SettingName.OCP.value].value_range = [0, current * 1.01]
@@ -169,7 +172,7 @@ class PyDPS(minimalmodbus.Instrument):
         """
         Get the current value of a parameter or setting by using either its address or the corresponding enum value
 
-        :param name: register address or coresponding :class:`ParamName`/:class:`SettingName` enum
+        :param name: register address or corresponding :class:`ParamName`/:class:`SettingName` enum
         :return: the current value of the queried modbus register
         """
         address = self._check_name(name)
@@ -196,6 +199,17 @@ class PyDPS(minimalmodbus.Instrument):
         else:
             self.write_register(address, value, 2)
 
+    def get_parameter_info(self, name):
+        """
+        Get the parameter info of the given parameter
+
+        :param name: register address or corresponding :class:`ParamName`/:class:`SettingName` enum
+        :return:
+        """
+        address = self._check_name(name)
+
+        return self.ParameterInfo[address]
+
     # -------------------------------
     # Get lists of parameters at once
     # -------------------------------
@@ -207,12 +221,12 @@ class PyDPS(minimalmodbus.Instrument):
         """
         response = self.read_registers(0x00, 13)
         data = {
-            ParamName.U_SET: response[0] * 0.01,
+            ParamName.V_SET: response[0] * 0.01,
             ParamName.I_SET: response[1] * 0.01,
-            ParamName.U_OUT: round(response[2] * 0.01, 2),
+            ParamName.V_OUT: round(response[2] * 0.01, 2),
             ParamName.I_OUT: round(response[3] * 0.01, 2),
             ParamName.P_OUT: round(response[4] * 0.01, 2),
-            ParamName.U_IN: response[5] * 0.01,
+            ParamName.V_IN: response[5] * 0.01,
             ParamName.LOCK: response[6],
             ParamName.PROTECT: response[7],
             ParamName.CV_CC: response[8],
@@ -231,12 +245,12 @@ class PyDPS(minimalmodbus.Instrument):
         """
         response = self.read_registers(0x00, 11)
         data = {
-            ParamName.U_SET: response[0] * 0.01,
+            ParamName.V_SET: response[0] * 0.01,
             ParamName.I_SET: response[1] * 0.01,
-            ParamName.U_OUT: round(response[2] * 0.01, 2),
+            ParamName.V_OUT: round(response[2] * 0.01, 2),
             ParamName.I_OUT: round(response[3] * 0.01, 2),
             ParamName.P_OUT: round(response[4] * 0.01, 2),
-            ParamName.U_IN: response[5] * 0.01,
+            ParamName.V_IN: response[5] * 0.01,
             ParamName.LOCK: response[6],
             ParamName.PROTECT: response[7],
             ParamName.CV_CC: response[8],
@@ -251,9 +265,9 @@ class PyDPS(minimalmodbus.Instrument):
 
         :return: Dictionary containing the returned values. Accessible via :class:ParamName enum
         """
-        response = self.read_registers(ParamName.U_OUT.value, 4)
+        response = self.read_registers(ParamName.V_OUT.value, 4)
         data = {
-            ParamName.U_OUT: round(response[0] * 0.01, 2),
+            ParamName.V_OUT: round(response[0] * 0.01, 2),
             ParamName.I_OUT: round(response[1] * 0.01, 2),
             ParamName.P_OUT: round(response[2] * 0.01, 2),
         }
@@ -265,9 +279,9 @@ class PyDPS(minimalmodbus.Instrument):
 
         :return: Dictionary containing the returned values. Accessible via :class:ParamName enum
         """
-        response = self.read_registers(ParamName.U_SET.value, 2)
+        response = self.read_registers(ParamName.V_SET.value, 2)
         data = {
-            ParamName.U_SET: round(response[0] * 0.01, 2),
+            ParamName.V_SET: round(response[0] * 0.01, 2),
             ParamName.I_SET: round(response[1] * 0.01, 2),
         }
         return data
@@ -310,7 +324,7 @@ class PyDPS(minimalmodbus.Instrument):
         :param voltage: desired voltage with 10 mV precision
         :return:
         """
-        self.set_parameter(ParamName.U_SET, voltage)
+        self.set_parameter(ParamName.V_SET, voltage)
 
     def get_set_voltage(self):
         """
@@ -318,7 +332,7 @@ class PyDPS(minimalmodbus.Instrument):
 
         :return: set voltage
         """
-        return self.get_parameter(ParamName.U_SET)
+        return self.get_parameter(ParamName.V_SET)
 
     def set_current(self, current):
         """
@@ -343,7 +357,7 @@ class PyDPS(minimalmodbus.Instrument):
 
         :return: current output voltage
         """
-        return self.get_parameter(ParamName.U_OUT)
+        return self.get_parameter(ParamName.V_OUT)
 
     def get_current(self):
         """
@@ -367,7 +381,7 @@ class PyDPS(minimalmodbus.Instrument):
 
         :return: input voltage
         """
-        return self.get_parameter(ParamName.U_IN)
+        return self.get_parameter(ParamName.V_IN)
 
     def set_key_lock(self, lock):
         """
