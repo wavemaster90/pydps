@@ -104,7 +104,7 @@ class PyDPS(minimalmodbus.Instrument):
         # --------------------------------
         # Initialize the modbus connection
         # --------------------------------
-        minimalmodbus.Instrument.__init__(self, port_name, slave_address, mode='rtu')
+        super().__init__(port_name, slave_address, mode='rtu')
         self.serial.baudrate = 9600
         self.serial.bytesize = 8
         self.serial.parity = serial.PARITY_NONE
