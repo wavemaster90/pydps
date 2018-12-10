@@ -377,8 +377,151 @@ def test_get_device_info(mocker):
 
     assert set(vals.keys()) == params
 
-# TODO: Test boiler plate getters and setters
-# TODO: Test read invalid register
-# TODO: Test write to read-only register
-# TODO: Test write values outside of permitted range
-# TODO: Test write wrong data tyepe (float instead of int)
+
+def test_set_voltage_boilerplate(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    val = 5.98
+
+    dps.set_voltage(val)
+
+    assert dps.get_set_voltage() == val
+
+
+def test_set_current_boilerplate(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    val = 1.76
+
+    dps.set_current(val)
+
+    assert dps.get_set_current() == val
+
+
+def test_get_voltage_boilerplate(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    assert dps.get_voltage() == device.param_registers[ParamName.V_OUT.value][2]
+
+
+def test_get_current_boilerplate(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    assert dps.get_current() == device.param_registers[ParamName.I_OUT.value][2]
+
+
+def test_get_power_boilerplate(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    assert dps.get_power() == device.param_registers[ParamName.P_OUT.value][2]
+
+
+def test_get_input_voltage_boilerplate(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    assert dps.get_input_voltage() == device.param_registers[ParamName.V_IN.value][2]
+
+
+def test_key_lock_boilerplate(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    val = True
+    dps.set_key_lock(val)
+    assert dps.get_key_lock() == val
+
+    val = 0
+    dps.set_key_lock(val)
+    assert dps.get_key_lock() == val
+
+    val = 1
+    dps.set_key_lock(val)
+    assert dps.get_key_lock() == val
+
+
+def test_get_protection_status_boilerplate(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    assert dps.get_protection_status() == device.param_registers[ParamName.PROTECT.value][2]
+
+    device.param_registers[ParamName.PROTECT.value][2] = 1
+    assert dps.get_protection_status() == device.param_registers[ParamName.PROTECT.value][2]
+
+
+def test_get_cc_cv_status_boilerplate(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    assert dps.get_cc_cv_status() == device.param_registers[ParamName.CV_CC.value][2]
+
+    device.param_registers[ParamName.CV_CC.value][2] = 1
+    assert dps.get_cc_cv_status() == device.param_registers[ParamName.CV_CC.value][2]
+
+
+def test_output_boilerplate(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    val = True
+    dps.set_output(val)
+    assert dps.get_output() == val
+
+    val = 0
+    dps.set_output(val)
+    assert dps.get_output() == val
+
+    val = 1
+    dps.set_output(val)
+    assert dps.get_output() == val
+
+
+def test_brightness_boilerplate(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    val = 4
+    dps.set_brightness(val)
+    assert dps.get_brightness() == val
+
+
+def test_get_model(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    assert dps.get_model() == device.param_registers[ParamName.MODEL.value][2]
+
+
+def test_get_firmware_version(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    assert dps.get_firmware_version() == device.param_registers[ParamName.VERSION.value][2]
+
+
+def test_read_invalid_register(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    with pytest.raises(ValueError):
+        dps.get_parameter(0x999)
+
+
+def test_write_invalid_register(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    with pytest.raises(ValueError):
+        dps.set_parameter(0x999, 1)
+
+
+def test_write_read_only_parameter(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    with pytest.raises(ValueError):
+        dps.set_parameter(ParamName.P_OUT, 50)
+
+
+def test_write_values_outside_permitted_range(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    with pytest.raises(ValueError):
+        dps.set_parameter(ParamName.B_LED, 6)
+
+
+def test_write_float_into_int_register(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    with pytest.raises(ValueError):
+        dps.set_parameter(ParamName.B_LED, 2.1)

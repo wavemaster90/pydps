@@ -1,6 +1,7 @@
 import minimalmodbus
 import serial
 import enum
+import numpy as np
 
 
 class ParamName(enum.Enum):
@@ -514,6 +515,10 @@ class PyDPS(minimalmodbus.Instrument):
             info = self.ParameterInfo[address]
         else:
             info = self.SettingInfo[address]
+
+        if info.integer and not isinstance(value, (int, bool, np.int8, np.int16, np.int32, np.int64, np.intc,
+                                                   np.uint, np.uint8, np.uint16, np.uint32, np.uint64, np.uintc)):
+            raise ValueError("The value needs to be integer or boolean")
 
         value_range = info.value_range
         if not value_range:
