@@ -270,6 +270,7 @@ class PyDPS(minimalmodbus.Instrument):
             ParamName.V_OUT: round(response[0] * 0.01, 2),
             ParamName.I_OUT: round(response[1] * 0.01, 2),
             ParamName.P_OUT: round(response[2] * 0.01, 2),
+            ParamName.V_IN: round(response[3] * 0.01, 2),
         }
         return data
 

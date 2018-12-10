@@ -67,6 +67,21 @@ class MockDPS:
         print("DPS: Register %s read." % info[0])
         return info[2]
 
+    def read_registers(self, start_register, num_registers):
+        """
+        Handle read register queries made from the client
+
+        :param start_register: address of first register
+        :param num_registers: number of registers to read
+        :return:
+        """
+        vals = []
+        for register in range(start_register, start_register + num_registers):
+            info = self._check_valid_register(register)
+            vals.append(info[2])
+            print("DPS: Register %s read." % info[0])
+        return vals
+
     def write_register(self, register, value, numberOfDecimals=0):
         """
         Handle write register commands to DPS
@@ -139,6 +154,7 @@ class MockBase(object):
         """
         mock_map = {
             'read_register': cls.mock_dps.read_register,
+            'read_registers': cls.mock_dps.read_registers,
             'write_register': cls.mock_dps.write_register,
         }
         keep_list = [
@@ -259,7 +275,108 @@ def test_generic_version_getter(mocker):
 
     assert isinstance(dps.get_parameter(ParamName.VERSION), float)
 
-# TODO: Test multiple value getters
+
+def test_get_all_parameters(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    vals = dps.get_all_parameters()
+
+    params = {
+        ParamName.V_SET,
+        ParamName.I_SET,
+        ParamName.V_OUT,
+        ParamName.I_OUT,
+        ParamName.P_OUT,
+        ParamName.V_IN,
+        ParamName.LOCK,
+        ParamName.PROTECT,
+        ParamName.CV_CC,
+        ParamName.ON_OFF,
+        ParamName.B_LED,
+        ParamName.MODEL,
+        ParamName.VERSION,
+    }
+
+    assert set(vals.keys()) == params
+
+
+def test_get_all_measurements(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    vals = dps.get_all_measurements()
+
+    params = {
+        ParamName.V_OUT,
+        ParamName.I_OUT,
+        ParamName.P_OUT,
+        ParamName.V_IN,
+    }
+
+    assert set(vals.keys()) == params
+
+
+def test_get_all_variables(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    vals = dps.get_all_variables()
+
+    params = {
+        ParamName.V_SET,
+        ParamName.I_SET,
+        ParamName.V_OUT,
+        ParamName.I_OUT,
+        ParamName.P_OUT,
+        ParamName.V_IN,
+        ParamName.LOCK,
+        ParamName.PROTECT,
+        ParamName.CV_CC,
+        ParamName.ON_OFF,
+        ParamName.B_LED,
+    }
+
+    assert set(vals.keys()) == params
+
+
+def test_get_set_values(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    vals = dps.get_set_values()
+
+    params = {
+        ParamName.V_SET,
+        ParamName.I_SET,
+    }
+
+    assert set(vals.keys()) == params
+
+
+def test_get_full_state_info(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    vals = dps.get_full_state_info()
+
+    params = {
+        ParamName.LOCK,
+        ParamName.PROTECT,
+        ParamName.CV_CC,
+        ParamName.ON_OFF,
+    }
+
+    assert set(vals.keys()) == params
+
+
+def test_get_device_info(mocker):
+    dps, modbus, device = initialize_connection(mocker)
+
+    vals = dps.get_device_info()
+
+    params = {
+        ParamName.MODEL,
+        ParamName.VERSION,
+    }
+
+    assert set(vals.keys()) == params
+
 # TODO: Test boiler plate getters and setters
 # TODO: Test read invalid register
 # TODO: Test write to read-only register
